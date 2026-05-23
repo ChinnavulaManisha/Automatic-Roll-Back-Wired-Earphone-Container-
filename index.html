@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Roll-Back Earphone Container — v2 Prototype</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d0f14;--panel:#13161f;--border:#1f2535;
+  --accent:#00c8ff;--accent2:#a855f7;--green:#10e084;
+  --text:#dde4f0;--muted:#5a6480;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
+
+/* Layout */
+#app{display:flex;flex-direction:column;height:100vh}
+#topbar{height:46px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-shrink:0}
+.logo{font-size:12px;font-weight:600;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.logo-ring{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.hdr-status{font-size:11px;font-family:var(--mono);color:var(--muted)}
+.hdr-btns{display:flex;gap:6px}
+.hbtn{padding:4px 12px;border:1px solid var(--border);border-radius:20px;font-size:11px;background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .15s}
+.hbtn:hover{border-color:var(--accent);color:var(--accent)}
+.hbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,.08)}
+
+#main{flex:1;display:grid;grid-template-columns:290px 1fr 240px;overflow:hidden}
+
+/* Panels */
+#lpanel,#rpanel{background:var(--panel);overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:14px}
+#lpanel{border-right:1px solid var(--border)}
+#rpanel{border-left:1px solid var(--border)}
+.sec-title{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.state-box{padding:9px 11px;border-radius:8px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.slbl{font-size:13px;font-weight:500}
+.mrow{display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.mk{font-size:11px;color:var(--muted)}
+.mv{font-size:11px;font-family:var(--mono);font-weight:500}
+.bwrap{height:3px;background:var(--border);border-radius:2px;margin-top:2px;overflow:hidden}
+.bfill{height:100%;border-radius:2px;transition:width .15s}
+
+/* LED display */
+.led-row{display:grid;grid-template-columns:repeat(12,1fr);gap:3px}
+.ld{aspect-ratio:1;border-radius:50%;border:1px solid rgba(255,255,255,.07);transition:background .1s,box-shadow .1s}
+
+/* Color Customizer */
+.color-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.cswatch{width:100%;aspect-ratio:1;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:all .15s;position:relative}
+.cswatch.active{border-color:#fff;transform:scale(1.1)}
+.cswatch::after{content:'';position:absolute;inset:0;border-radius:4px;background:linear-gradient(135deg,rgba(255,255,255,.18),transparent)}
+
+/* Finish selector */
+.finish-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.fbtn{padding:6px 4px;text-align:center;font-size:10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:all .15s}
+.fbtn.active,.fbtn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Pattern selector */
+.pat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.pbtn{padding:6px 4px;text-align:center;font-size:10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:all .15s}
+.pbtn.active,.pbtn:hover{border-color:var(--accent2);color:var(--accent2)}
+
+/* Action buttons */
+.abtn{width:100%;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.abtn:hover{border-color:var(--accent);color:var(--accent)}
+.abtn.go{background:linear-gradient(135deg,#0ea5e9,#a855f7);border-color:transparent;color:#fff}
+.abtn.go:hover{opacity:.88}
+.abtn:disabled{opacity:.3;cursor:not-allowed}
+.abtn.danger{border-color:#ff4466;color:#ff4466}
+
+/* Log */
+.log-box{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px;max-height:130px;overflow-y:auto;font-family:var(--mono);font-size:10px}
+.ll{padding:1px 0;color:var(--muted)}
+.ll .t{color:var(--accent)}
+.ll .g{color:var(--green)}
+.ll .e{color:#ff4466}
+.ll .w{color:#ffb020}
+
+/* Viewport */
+#vp{position:relative;overflow:hidden;background:var(--bg)}
+#c3d{width:100%;height:100%;display:block}
+.vp-badge{position:absolute;padding:4px 10px;background:rgba(0,0,0,.7);border:1px solid var(--border);border-radius:6px;font-size:10px;font-family:var(--mono);color:var(--accent);pointer-events:none}
+#badge-tl{top:10px;left:10px}
+#badge-tr{top:10px;right:10px}
+#badge-bl{bottom:10px;left:10px}
+.cam-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);pointer-events:none}
+
+/* Slider */
+input[type=range]{width:100%;accent-color:var(--accent);height:3px;margin:4px 0}
+
+/* Bottom bar */
+#bbar{height:50px;background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;gap:0;padding:0 18px;flex-shrink:0;overflow:hidden}
+.tstep{display:flex;align-items:center;gap:0;flex:1}
+.tnode-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tnode{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;transition:all .3s;flex-shrink:0}
+.tnode.a{border-color:var(--accent);color:var(--accent);box-shadow:0 0 10px var(--accent)}
+.tnode.d{background:var(--green);border-color:var(--green);color:#000}
+.tline{flex:1;height:2px;background:var(--border);transition:background .4s}
+.tline.d{background:var(--green)}
+.tlbl{font-size:8px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.prog-pill{margin-left:14px;width:120px;flex-shrink:0}
+.prog-lbl{font-size:10px;color:var(--muted);margin-bottom:3px}
+.prog-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .12s}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo"><div class="logo-ring"></div>Roll-Back Earphone Container</div>
+  <div class="hdr-status" id="topStatus">STATE: IDLE · CYCLES: 0</div>
+  <div class="hdr-btns">
+    <button class="hbtn on" id="btnAR" onclick="toggleAR()">Auto-rotate</button>
+    <button class="hbtn" id="btnCut" onclick="toggleCutaway()">X-Ray</button>
+    <button class="hbtn" id="btnExp" onclick="toggleExplode()">Explode</button>
+    <button class="hbtn" id="btnCap" onclick="toggleCap()">Open Cap</button>
+  </div>
+</div>
+
+<div id="main">
+
+<!-- LEFT PANEL -->
+<div id="lpanel">
+  <div>
+    <div class="sec-title">Device State</div>
+    <div class="state-box"><div class="sdot" id="sdot" style="background:var(--accent);box-shadow:0 0 6px var(--accent)"></div><span class="slbl" id="slbl">IDLE</span></div>
+  </div>
+  <div>
+    <div class="sec-title">Telemetry</div>
+    <div class="mrow"><span class="mk">Wire retracted</span><span class="mv" id="mWire">0%</span></div>
+    <div class="bwrap"><div class="bfill" id="bWire" style="width:0%;background:var(--accent)"></div></div>
+    <div class="mrow" style="margin-top:5px"><span class="mk">Motor PWM</span><span class="mv" id="mPwm">0/255</span></div>
+    <div class="bwrap"><div class="bfill" id="bPwm" style="width:0%;background:var(--accent2)"></div></div>
+    <div class="mrow" style="margin-top:5px"><span class="mk">Spring tension</span><span class="mv" id="mSpring">0.30N</span></div>
+    <div class="bwrap"><div class="bfill" id="bSpring" style="width:30%;background:var(--green)"></div></div>
+    <div class="mrow" style="margin-top:5px"><span class="mk">Cycles</span><span class="mv" id="mCyc">0</span></div>
+  </div>
+  <div>
+    <div class="sec-title">LED Ring · WS2812B ×12</div>
+    <div class="led-row" id="ledRow"></div>
+  </div>
+  <div>
+    <div class="sec-title">Reference Images</div>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <img src="Image1.png" style="width:100%; border-radius:6px; border:1px solid var(--border); object-fit:cover;" alt="Reference Image 1 (Replace src with your image)">
+      <img src="Image2.png" style="width:100%; border-radius:6px; border:1px solid var(--border); object-fit:cover;" alt="Reference Image 2 (Replace src with your image)">
+    </div>
+  </div>
+</div>
+
+<!-- 3D VIEWPORT -->
+<div id="vp">
+  <canvas id="c3d"></canvas>
+  <div class="vp-badge" id="badge-tl">Upper shell + cap</div>
+  <div class="vp-badge" id="badge-tr">12× WS2812B LED ring</div>
+  <div class="vp-badge" id="badge-bl">Spool · Jack exits center hole</div>
+  <div class="cam-hint">Drag to orbit · Scroll to zoom · Right-drag pan</div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div id="rpanel">
+  <div>
+    <div class="sec-title">Controls</div>
+    <button class="abtn go" id="btnIns" onclick="doInsert()">▶  Insert jack</button>
+    <!-- <button class="abtn" id="btnPull" onclick="doPull()" disabled>⬇  Extend Wire</button> -->
+     <br>
+    <button class="abtn danger" onclick="doReset()">↺  Reset</button>
+  </div>
+
+  <div>
+    <div class="sec-title">Container Color</div>
+    <div class="color-grid" id="colorGrid"></div>
+    <div style="margin-top:8px">
+      <div class="sec-title" style="margin-bottom:5px">Custom color</div>
+      <input type="color" id="customColor" value="#ffffff" style="width:100%;height:28px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:2px">
+    </div>
+  </div>
+
+  <div>
+    <div class="sec-title">Surface Finish</div>
+    <div class="finish-row" id="finishRow"></div>
+  </div>
+
+  <div>
+    <div class="sec-title">Pattern / Texture</div>
+    <div class="pat-grid" id="patGrid"></div>
+  </div>
+
+  <div>
+    <div class="sec-title">LED Theme</div>
+    <div class="pat-grid" id="ledThemeGrid"></div>
+  </div>
+
+  <div>
+    <div class="sec-title">View Presets</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+      <button class="abtn" onclick="setView('iso')">Isometric</button>
+      <button class="abtn" onclick="setView('top')">Top</button>
+      <button class="abtn" onclick="setView('front')">Front</button>
+      <button class="abtn" onclick="setView('inside')">Inside</button>
+      <button class="abtn" onclick="setView('side')">Side</button>
+      <button class="abtn" onclick="setView('bottom')">Bottom</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="sec-title">Event Log</div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- BOTTOM BAR -->
+<div id="bbar">
+  <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;margin-right:12px">Cycle</div>
+  <div class="tstep" id="timeline"></div>
+  <div class="prog-pill">
+    <div class="prog-lbl">Retract progress</div>
+    <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =====================================================================
+//  SCENE
+// =====================================================================
+const canvas = document.getElementById('c3d');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0d14);
+scene.fog = new THREE.Fog(0x0a0d14, 35, 80);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+
+// Camera state
+let cam = { theta: -0.55, phi: 1.08, dist: 18, tx: 0, ty: 1 };
+let camT = { ...cam };
+function applyCam() {
+  const c = cam;
+  camera.position.set(
+    c.tx + c.dist * Math.sin(c.phi) * Math.sin(c.theta),
+    c.ty  + c.dist * Math.cos(c.phi),
+    c.dist * Math.sin(c.phi) * Math.cos(c.theta)
+  );
+  camera.lookAt(c.tx, c.ty, 0);
+}
+
+// Mouse/touch orbit + bud drag
+let drag = false, rDrag = false, lx = 0, ly = 0;
+
+// --- Earbud drag system ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let budDragging = false;    // true when user is dragging an earbud
+let budDragPct = 0;         // 0 = stored, 1 = fully pulled out
+let budDragStartX = 0;
+let budHighlight = false;   // true when hovering over a bud
+
+function getMouseNDC(e) {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function hitTestBuds(e) {
+  if (budGrp.children.length === 0 || !budGrp.visible) return false;
+  getMouseNDC(e);
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(budGrp.children, true);
+  return hits.length > 0;
+}
+
+canvas.addEventListener('mousedown', e => {
+  lx = e.clientX; ly = e.clientY;
+  // Check if clicking on earbuds in STORED state
+  if (state === ST.STORED && capOpen && e.button === 0 && hitTestBuds(e)) {
+    budDragging = true;
+    budDragStartX = e.clientX;
+    budDragPct = 0;
+    canvas.style.cursor = 'grabbing';
+    e.preventDefault();
+    log('Grabbed earbuds — drag to pull out', 'w');
+    return;
+  }
+  drag = true; rDrag = e.button === 2;
+  e.preventDefault();
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('mouseup', () => {
+  if (budDragging) {
+    budDragging = false;
+    canvas.style.cursor = budHighlight ? 'grab' : '';
+    if (budDragPct >= 0.85) {
+      // Successfully pulled out — transition to IDLE with wire extended
+      budDragPct = 1;
+      wirePct = 0;
+      spoolGrp.rotation.y = 0;
+      buildWire(0); buildBuds(0);
+      wireGrp.visible = true; budGrp.visible = true;
+      setState(ST.IDLE);
+      document.getElementById('btnIns').disabled = false;
+      document.getElementById('btnPull').disabled = true;
+      log('Earbuds pulled out — wire extended', 'g');
+    } else {
+      // Snap back to stored
+      budDragPct = 0;
+      buildWire(1); buildBuds(1);
+      log('Released — earbuds snapped back', 'w');
+    }
+  }
+  drag = false;
+});
+window.addEventListener('mousemove', e => {
+  // Bud drag mode
+  if (budDragging) {
+    const dx = e.clientX - budDragStartX;
+    budDragPct = Math.max(0, Math.min(1, dx / 200));
+    // Reverse the retraction: wirePct goes from 1→0 as user drags out
+    const reversePct = 1 - budDragPct;
+    buildWire(reversePct);
+    buildBuds(reversePct);
+    return;
+  }
+  // Hover cursor for buds
+  if (state === ST.STORED && capOpen && !drag) {
+    const hit = hitTestBuds(e);
+    if (hit && !budHighlight) { canvas.style.cursor = 'grab'; budHighlight = true; }
+    else if (!hit && budHighlight) { canvas.style.cursor = ''; budHighlight = false; }
+  } else if (budHighlight) { canvas.style.cursor = ''; budHighlight = false; }
+  // Camera orbit
+  if (!drag) return;
+  const dx = e.clientX - lx, dy = e.clientY - ly;
+  lx = e.clientX; ly = e.clientY;
+  if (rDrag) { camT.tx -= dx * 0.012; camT.ty += dy * 0.012; }
+  else { camT.theta -= dx * 0.007; camT.phi = Math.max(0.05, Math.min(Math.PI - 0.05, camT.phi + dy * 0.007)); }
+});
+canvas.addEventListener('wheel', e => { camT.dist = Math.max(5, Math.min(42, camT.dist + e.deltaY * 0.02)); }, { passive: true });
+
+// Lights
+scene.add(new THREE.AmbientLight(0x10192a, 1.1));
+const sun = new THREE.DirectionalLight(0xc8d8ff, 1.5);
+sun.position.set(8, 15, 10); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x3344aa, 0.5);
+fill.position.set(-10, 3, -8); scene.add(fill);
+const rim = new THREE.DirectionalLight(0x00eebb, 0.3);
+rim.position.set(0, -6, -12); scene.add(rim);
+
+// Grid floor
+const grid = new THREE.GridHelper(50, 50, 0x1a2235, 0x111828);
+grid.position.y = -4.2; scene.add(grid);
+
+// =====================================================================
+//  CUSTOMIZER STATE
+// =====================================================================
+const COLORS = [
+  { name:'Pearl White',  hex:'#f0f2f8', three:0xf0f2f8 },
+  { name:'Midnight',     hex:'#1a1f2e', three:0x1a1f2e },
+  { name:'Sky Blue',     hex:'#4ab0ff', three:0x4ab0ff },
+  { name:'Rose Gold',    hex:'#e8a090', three:0xe8a090 },
+  { name:'Mint Green',   hex:'#5cdba0', three:0x5cdba0 },
+  { name:'Lilac',        hex:'#c090ee', three:0xc090ee },
+  { name:'Coral',        hex:'#ff7055', three:0xff7055 },
+  { name:'Graphite',     hex:'#4a5060', three:0x4a5060 },
+  { name:'Gold',         hex:'#e8c060', three:0xe8c060 },
+  { name:'Red',          hex:'#e03040', three:0xe03040 },
+  { name:'Forest',       hex:'#2e8050', three:0x2e8050 },
+  { name:'Navy',         hex:'#1e3a6e', three:0x1e3a6e },
+];
+const FINISHES = ['Matte','Gloss','Satin','Metallic','Rubber'];
+const PATTERNS = ['Plain','Basketball','Cartoon','Gradient','Carbon','Hexagon','Doraemon'];
+const LED_THEMES = ['Blue Breath','Rainbow','Purple Comet','Green Pulse','Red Alert','Cyan Chase'];
+
+let curColor = 0, curFinish = 1, curPattern = 0, curLEDTheme = 0;
+let shellMat, capMat;
+
+// =====================================================================
+//  MATERIALS FACTORY
+// =====================================================================
+function makeMat(colorHex, finish) {
+  const props = {
+    color: colorHex,
+    Matte:    { metalness:0.0, roughness:0.85, clearcoat:0 },
+    Gloss:    { metalness:0.05, roughness:0.05, clearcoat:1.0, clearcoatRoughness:0.05 },
+    Satin:    { metalness:0.02, roughness:0.35, clearcoat:0.5, clearcoatRoughness:0.2 },
+    Metallic: { metalness:0.85, roughness:0.15, clearcoat:0.3 },
+    Rubber:   { metalness:0.0, roughness:0.95, clearcoat:0 },
+  };
+  const f = FINISHES[finish];
+  return new THREE.MeshPhysicalMaterial({ color:colorHex, ...(props[f]||props.Gloss) });
+}
+
+function generatePatternTexture(pIndex, hexColor) {
+  if (pIndex === 0) return null; // Plain
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  const baseCol = '#' + new THREE.Color(hexColor).getHexString().padStart(6, '0');
+  ctx.fillStyle = baseCol;
+  ctx.fillRect(0, 0, 512, 512);
+
+  if (pIndex === 1) { // Basketball
+    ctx.fillStyle = '#d96c21';
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(256, 0); ctx.lineTo(256, 512); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 256); ctx.lineTo(512, 256); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-100, 256, 300, -Math.PI/2, Math.PI/2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(612, 256, 300, Math.PI/2, Math.PI*1.5); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    for(let i=0; i<15000; i++) {
+      ctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
+    }
+  } else if (pIndex === 2) { // Cartoon
+    ctx.fillStyle = baseCol;
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 15;
+    ctx.fillStyle = '#f9d71c'; // yellow face
+    ctx.beginPath(); ctx.arc(256, 256, 180, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(180, 200, 25, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(332, 200, 25, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(256, 260, 100, 0.2*Math.PI, 0.8*Math.PI); ctx.stroke();
+  } else if (pIndex === 3) { // Gradient
+    const grad = ctx.createLinearGradient(0, 0, 512, 512);
+    grad.addColorStop(0, '#ff9a9e');
+    grad.addColorStop(0.5, '#fecfef');
+    grad.addColorStop(1, '#a18cd1');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 512, 512);
+  } else if (pIndex === 4) { // Carbon
+    ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 512, 512);
+    ctx.fillStyle = '#333';
+    for(let y=0; y<512; y+=32) {
+      for(let x=0; x<512; x+=32) {
+        if((Math.floor(x/32)+Math.floor(y/32))%2 === 0) ctx.fillRect(x, y, 32, 16);
+        else ctx.fillRect(x+16, y+16, 16, 32);
+      }
+    }
+  } else if (pIndex === 5) { // Hexagon
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 4;
+    const a = 30; // hex size
+    for (let y = 0; y < 512+a; y += a*1.5) {
+      for (let x = 0; x < 512+a; x += a*Math.sqrt(3)) {
+        const cx = x + (Math.round(y/(a*1.5))%2 === 1 ? a*Math.sqrt(3)/2 : 0);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = i * Math.PI / 3;
+          const px = cx + a * Math.cos(angle);
+          const py = y + a * Math.sin(angle);
+          if (i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  } else if (pIndex === 6) { // Doraemon
+    ctx.fillStyle = baseCol;
+    ctx.fillRect(0, 0, 512, 512);
+    
+    // White Face
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(256, 290, 200, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.stroke();
+    
+    // Eyes
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(215, 170, 45, 55, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(297, 170, 45, 55, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    
+    // Pupils
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(225, 180, 15, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(287, 180, 15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(225, 175, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(287, 175, 5, 0, Math.PI*2); ctx.fill();
+    
+    // Nose
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath(); ctx.arc(256, 230, 28, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; // highlight
+    ctx.beginPath(); ctx.arc(246, 220, 8, 0, Math.PI*2); ctx.fill();
+    
+    // Mouth / Line
+    ctx.beginPath(); ctx.moveTo(256, 258); ctx.lineTo(256, 400); ctx.stroke();
+    ctx.beginPath(); ctx.arc(256, 250, 150, 0.2*Math.PI, 0.8*Math.PI); ctx.stroke();
+    
+    // Whiskers
+    ctx.lineWidth = 4;
+    // Left
+    ctx.beginPath(); ctx.moveTo(100, 240); ctx.lineTo(200, 260); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(90, 275); ctx.lineTo(195, 275); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(100, 310); ctx.lineTo(200, 290); ctx.stroke();
+    // Right
+    ctx.beginPath(); ctx.moveTo(412, 240); ctx.lineTo(312, 260); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(422, 275); ctx.lineTo(317, 275); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(412, 310); ctx.lineTo(312, 290); ctx.stroke();
+    
+    // Collar & Bell
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(80, 420, 352, 25);
+    ctx.strokeRect(80, 420, 352, 25);
+    
+    ctx.fillStyle = '#f9d71c';
+    ctx.beginPath(); ctx.arc(256, 455, 30, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(226, 445); ctx.lineTo(286, 445); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(226, 452); ctx.lineTo(286, 452); ctx.stroke();
+    ctx.beginPath(); ctx.arc(256, 465, 6, 0, Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(256, 471); ctx.lineTo(256, 485); ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  if (pIndex === 4 || pIndex === 5) {
+    tex.repeat.set(4, 4); // Tile carbon/hexagon
+  }
+  return tex;
+}
+
+function updateShellColor() {
+  const c = curColor === 'custom' ? customHex : COLORS[curColor].three;
+  const f = curFinish;
+  const nm = makeMat(c, f);
+  shellMat.color.set(nm.color);
+  shellMat.metalness = nm.metalness;
+  shellMat.roughness = nm.roughness;
+  shellMat.clearcoat = nm.clearcoat || 0;
+  shellMat.clearcoatRoughness = nm.clearcoatRoughness || 0;
+  
+  const mapTex = generatePatternTexture(curPattern, c);
+  shellMat.map = mapTex;
+  if (mapTex) shellMat.color.setHex(0xffffff); // Use texture colors raw
+  shellMat.needsUpdate = true;
+  
+  capMat.color.copy(shellMat.color);
+  capMat.metalness = shellMat.metalness;
+  capMat.roughness = shellMat.roughness;
+  capMat.clearcoat = shellMat.clearcoat;
+  capMat.clearcoatRoughness = shellMat.clearcoatRoughness;
+  capMat.map = mapTex;
+  capMat.needsUpdate = true;
+}
+
+let customHex = 0xffffff;
+
+// =====================================================================
+//  GEOMETRY — DEVICE
+// =====================================================================
+const BR = 3.8, BH = 2.2;
+const device = new THREE.Group();
+scene.add(device);
+
+// --- Materials ---
+shellMat = new THREE.MeshPhysicalMaterial({ color:0xf0f2f8, metalness:0.05, roughness:0.05, clearcoat:1, clearcoatRoughness:0.05 });
+capMat   = new THREE.MeshPhysicalMaterial({ color:0xf0f2f8, metalness:0.05, roughness:0.05, clearcoat:1, clearcoatRoughness:0.05 });
+const M = {
+  inner:  new THREE.MeshPhongMaterial({ color:0xd8dce8, shininess:20 }),
+  pcb:    new THREE.MeshPhongMaterial({ color:0x0f5c28, shininess:25 }),
+  spool:  new THREE.MeshPhysicalMaterial({ color:0x333344, roughness:0.4, metalness:0.1 }),
+  axle:   new THREE.MeshPhongMaterial({ color:0x888899, shininess:90 }),
+  motor:  new THREE.MeshPhongMaterial({ color:0x222228, shininess:60 }),
+  spring: new THREE.MeshPhongMaterial({ color:0xc0c8d8, shininess:100 }),
+  wire:   new THREE.MeshPhongMaterial({ color:0xffffff, shininess:15 }),
+  jack:   new THREE.MeshPhongMaterial({ color:0x181818, shininess:120 }),
+  jacBand:new THREE.MeshPhongMaterial({ color:0x222222, shininess:50 }),
+  window: new THREE.MeshPhysicalMaterial({ color:0x99ccee, roughness:0, transparent:true, opacity:0.22, transmission:0.7 }),
+  batt:   new THREE.MeshPhongMaterial({ color:0x195078, shininess:20 }),
+  seam:   new THREE.MeshPhongMaterial({ color:0xaaaaaa, shininess:40 }),
+  led:    new THREE.MeshPhongMaterial({ color:0x0033ff, emissive:0x0033ff, emissiveIntensity:0.5 }),
+  earbud: new THREE.MeshPhysicalMaterial({ color:0xf8f8f8, roughness:0.25, clearcoat:0.8 }),
+  jacktip:new THREE.MeshPhongMaterial({ color:0x777777, shininess:100 }),
+  bearing:new THREE.MeshPhongMaterial({ color:0x909090, shininess:120 }),
+};
+
+// == LOWER BODY ==
+const lowerBody = new THREE.Mesh(new THREE.CylinderGeometry(BR, BR*0.97, BH*0.55, 80), shellMat);
+lowerBody.position.y = BH*0.55*0.5;
+lowerBody.castShadow = true; lowerBody.receiveShadow = true;
+device.add(lowerBody);
+
+// Seam ring
+const seam = new THREE.Mesh(new THREE.TorusGeometry(BR+0.01, 0.025, 8, 80), M.seam);
+seam.rotation.x = Math.PI/2; seam.position.y = BH*0.55;
+device.add(seam);
+
+// == UPPER BODY ==
+const upperBody = new THREE.Mesh(new THREE.CylinderGeometry(BR, BR, BH*0.45, 80), shellMat);
+upperBody.position.y = BH*0.55 + BH*0.45*0.5;
+upperBody.castShadow = true;
+device.add(upperBody);
+
+// Spinning spool cover (top face) with light-catching gradient
+const winMesh = new THREE.Group();
+winMesh.position.y = BH + 0.045;
+
+// Helper to project flat planar UV coordinates onto radial/ring geometries
+function applyPlanarUVs(geom, outerRadius) {
+  const pos = geom.attributes.position;
+  const uvs = geom.attributes.uv;
+  if (!pos || !uvs) return;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const u = (x + outerRadius) / (2 * outerRadius);
+    const v = (y + outerRadius) / (2 * outerRadius);
+    uvs.setXY(i, u, v);
+  }
+  uvs.needsUpdate = true;
+}
+
+// Outer cover base: flat ring with a hole in the center (radius 0.42)
+const coverTopGeom = new THREE.RingGeometry(0.42, BR-0.2, 80);
+applyPlanarUVs(coverTopGeom, BR-0.2);
+const coverTop = new THREE.Mesh(coverTopGeom, shellMat);
+coverTop.rotation.x = -Math.PI/2;
+coverTop.position.y = 0.045;
+coverTop.receiveShadow = true;
+coverTop.castShadow = true;
+
+// Side wall of the cover base: open-ended cylinder
+const coverSide = new THREE.Mesh(new THREE.CylinderGeometry(BR-0.2, BR-0.2, 0.09, 80, 1, true), shellMat);
+coverSide.position.y = 0;
+coverSide.castShadow = true;
+
+winMesh.add(coverTop);
+winMesh.add(coverSide);
+
+// Procedural soft conical light reflection (bowtie shape)
+const texSize = 512;
+const canvasTex = document.createElement('canvas');
+canvasTex.width = texSize; canvasTex.height = texSize;
+const ctx = canvasTex.getContext('2d');
+const cx = texSize/2, cy = texSize/2;
+for(let a=0; a<360; a++) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  const rad = a * Math.PI / 180;
+  ctx.lineTo(cx + Math.cos(rad)*texSize, cy + Math.sin(rad)*texSize);
+  // 2-lobe bowtie reflection
+  const intensity = Math.pow(Math.sin(rad), 4);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${intensity * 0.4})`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+const spinTex = new THREE.CanvasTexture(canvasTex);
+const highlightMat = new THREE.MeshBasicMaterial({
+  map: spinTex,
+  transparent: true,
+  opacity: 0.6,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+
+// Translucent highlight ring
+const coverHighlightGeom = new THREE.RingGeometry(0.42, BR-0.19, 80);
+applyPlanarUVs(coverHighlightGeom, BR-0.19);
+const coverHighlight = new THREE.Mesh(coverHighlightGeom, highlightMat);
+coverHighlight.rotation.x = -Math.PI/2;
+coverHighlight.position.y = 0.046; // Slightly above coverTop to prevent z-fighting
+winMesh.add(coverHighlight);
+
+// Central Hole assembly (double ring collar from the reference image)
+const lathePoints = [];
+lathePoints.push(new THREE.Vector2(0.13, -0.6));  // Deep inside the hole (clearance for 0.22 axle)
+lathePoints.push(new THREE.Vector2(0.13, 0.0));   // Base of the inner wall
+lathePoints.push(new THREE.Vector2(0.13, 0.06));  // Top inner edge of inner raised ring
+lathePoints.push(new THREE.Vector2(0.18, 0.06));  // Top outer edge of inner raised ring
+lathePoints.push(new THREE.Vector2(0.24, -0.06)); // Sloping down to bottom of the dark groove
+lathePoints.push(new THREE.Vector2(0.28, -0.06)); // Outer bottom of the groove
+lathePoints.push(new THREE.Vector2(0.38, 0.12));  // Rising up to the peak of outer ring
+lathePoints.push(new THREE.Vector2(0.42, 0.12));  // Flat peak of outer ring
+lathePoints.push(new THREE.Vector2(0.48, -0.01)); // Outer edge sitting slightly inside the cover to avoid z-fighting
+
+const centralHoleGeom = new THREE.LatheGeometry(lathePoints, 64);
+const centralHoleMat = new THREE.MeshPhysicalMaterial({
+  color: 0xb0b7c6,       // Cool metallic silver-grey
+  metalness: 0.9,        // High metalness for reflections
+  roughness: 0.15,       // Smooth, clean reflections
+  clearcoat: 1.0,        // Premium glossy finish
+  clearcoatRoughness: 0.05,
+  side: THREE.DoubleSide // Ensure visibility from all angles
+});
+const centralHole = new THREE.Mesh(centralHoleGeom, centralHoleMat);
+centralHole.position.y = 0.045; // Align to the cover height relative to winMesh
+centralHole.castShadow = true;
+centralHole.receiveShadow = true;
+winMesh.add(centralHole);
+
+device.add(winMesh);
+
+// LED bezel ring
+const bezel = new THREE.Mesh(new THREE.TorusGeometry(BR-0.14, 0.13, 10, 80), new THREE.MeshPhongMaterial({ color:0xcccccc, shininess:60 }));
+bezel.rotation.x = Math.PI/2; bezel.position.y = BH - 0.06;
+device.add(bezel);
+
+// Jack exit hole ring and inner hole are now replaced by the high-fidelity centralHole Lathe inside winMesh.
+
+// No USB-C port — magnetic auto-rollback, no charging port needed
+
+// == CAP (hinged lid — pivots around rear rim like a tin lid) ==
+// We use a pivot group at the rear rim, with the cap mesh offset forward
+const capPivot = new THREE.Group(); // sits at hinge point: (0, BH+0.19, +BR)
+capPivot.position.set(0, BH + 0.19, BR);
+device.add(capPivot);
+
+const capGrp = new THREE.Group();
+// Offset the cap so its rear edge sits at the pivot (z = -BR relative to pivot)
+capGrp.position.set(0, 0, -BR);
+capPivot.add(capGrp);
+
+// Flat lid disk
+const capDisk = new THREE.Mesh(new THREE.CylinderGeometry(BR - 0.02, BR - 0.02, 0.18, 80), capMat);
+capDisk.position.y = 0.09;
+// Rim lip
+const capLip = new THREE.Mesh(new THREE.CylinderGeometry(BR + 0.02, BR + 0.02, 0.22, 80, 1, true), capMat);
+capLip.position.y = 0.0;
+capGrp.add(capDisk, capLip);
+
+// == LED RING ==
+const LED_N = 12;
+const ledMeshes = [], ledLights = [];
+const ledR = BR - 0.18;
+for (let i = 0; i < LED_N; i++) {
+  const a = (i / LED_N) * Math.PI * 2;
+  const x = Math.cos(a) * ledR, z = Math.sin(a) * ledR;
+  const lm = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), M.led.clone());
+  lm.position.set(x, BH - 0.07, z);
+  device.add(lm); ledMeshes.push(lm);
+  const pl = new THREE.PointLight(0x0040ff, 0, 1.4);
+  pl.position.set(x, BH + 0.04, z);
+  device.add(pl); ledLights.push(pl);
+}
+
+// == INTERNALS ==
+// PCB
+const pcb = new THREE.Mesh(new THREE.CylinderGeometry(BR-0.55, BR-0.55, 0.09, 72), M.pcb);
+pcb.position.y = 0.55;
+device.add(pcb);
+
+// Copper traces
+for (let i = 0; i < 8; i++) {
+  const tr = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.015, 0.9 + Math.random()*1.8), new THREE.MeshPhongMaterial({ color:0xb87333, shininess:80 }));
+  const angle = Math.random()*Math.PI*2, r = 0.5 + Math.random()*(BR-1.2);
+  tr.position.set(Math.cos(angle)*r*0.7, 0.61, Math.sin(angle)*r*0.7);
+  tr.rotation.y = Math.random()*Math.PI;
+  device.add(tr);
+}
+
+// Small ICs on PCB
+for (let i = 0; i < 4; i++) {
+  const ic = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.25), new THREE.MeshPhongMaterial({ color:0x111111 }));
+  const a = (i/4)*Math.PI*2, r = 1.8;
+  ic.position.set(Math.cos(a)*r, 0.64, Math.sin(a)*r);
+  device.add(ic);
+}
+
+// Capacitors
+for (let i = 0; i < 6; i++) {
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.17, 8), new THREE.MeshPhongMaterial({ color:0x2244aa }));
+  const a = (i/6)*Math.PI*2+0.3, r = 2.5;
+  cap.position.set(Math.cos(a)*r, 0.65, Math.sin(a)*r);
+  device.add(cap);
+}
+
+// == SPOOL (dark, like image 2/3) ==
+const spoolGrp = new THREE.Group();
+const spoolBody = new THREE.Mesh(new THREE.CylinderGeometry(1.88, 1.88, 0.85, 72), M.spool);
+const spoolF1   = new THREE.Mesh(new THREE.CylinderGeometry(2.42, 2.42, 0.11, 72), M.spool);
+const spoolF2   = spoolF1.clone();
+spoolF1.position.y = 0.48; spoolF2.position.y = -0.48;
+const spoolAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.15, 20), M.axle);
+// White center ring on spool (as seen in images)
+const spoolCenterRing = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.30, 0.12, 24), new THREE.MeshPhysicalMaterial({ color:0xfafafa, roughness:0.2 }));
+spoolCenterRing.position.y = 0.5;
+// Spokes
+for (let i = 0; i < 6; i++) {
+  const sp = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.09, 0.11), M.spool);
+  sp.rotation.y = (i/6)*Math.PI;
+  spoolGrp.add(sp);
+}
+spoolGrp.add(spoolBody, spoolF1, spoolF2, spoolAxle, spoolCenterRing);
+spoolGrp.position.y = 1.5;
+device.add(spoolGrp);
+
+// Bearings
+for (let s of [-1, 1]) {
+  const br = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.09, 8, 24), M.bearing);
+  br.rotation.x = Math.PI/2; br.position.set(0, 1.5 + s*0.67, 0);
+  device.add(br);
+}
+
+// == MOTOR + GEARBOX ==
+const motorGrp = new THREE.Group();
+const mBody = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.30, 20), M.motor);
+mBody.rotation.z = Math.PI/2;
+const mCap = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 0.11, 20), M.motor);
+mCap.rotation.z = Math.PI/2; mCap.position.x = 0.70;
+const mShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.5, 10), M.axle);
+mShaft.rotation.z = Math.PI/2; mShaft.position.x = -0.88;
+motorGrp.add(mBody, mCap, mShaft);
+motorGrp.position.set(2.2, 1.0, 0);
+device.add(motorGrp);
+
+// Gearbox
+const gbox = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.78, 0.78), new THREE.MeshPhongMaterial({ color:0x444433 }));
+gbox.position.set(1.45, 1.0, 0); device.add(gbox);
+
+// Spring barrel
+const sprBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.54, 0.72, 32), M.spring);
+sprBarrel.position.set(-2.2, 1.4, 0); device.add(sprBarrel);
+
+// No battery mesh — magnetic spring-based auto-rollback, no battery charging needed
+
+// =====================================================================
+//  WIRE SYSTEM — flat horizontal circular winding on spool
+// =====================================================================
+const wireGrp = new THREE.Group();
+device.add(wireGrp);
+
+function buildWire(pct) {
+  wireGrp.clear();
+  const exitY = BH + 0.06;
+
+  // SPOOL WINDINGS: flat horizontal circles (like a real cable reel)
+  if (pct > 0.04) {
+    const woundTurns = pct * 6.0;
+    const stepsPerTurn = 40;
+    const totalSteps = Math.max(8, Math.floor(woundTurns * stepsPerTurn));
+    const spoolY = 1.5; // spool sits at Y=1.5, wire stays flat here
+    const exitAngle = spoolGrp.rotation.y;
+    const pts = [];
+    for (let i = 0; i <= totalSteps; i++) {
+      const t = i / totalSteps;
+      const currentTurn = t * woundTurns;
+      const angle = currentTurn * Math.PI * 2 + exitAngle;
+      // Fixed spiral: r depends on how many turns from the center
+      const r = 0.35 + currentTurn * 0.25;
+      const y = spoolY; // Perfectly flat horizontal winding
+      pts.push(new THREE.Vector3(Math.cos(angle)*r, y, Math.sin(angle)*r));
+    }
+    if (pts.length >= 3) {
+      try {
+        const curve = new THREE.CatmullRomCurve3(pts);
+        wireGrp.add(new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(12,totalSteps), 0.048, 6, false), M.wire));
+      } catch(e) {}
+    }
+    // Internal wire lead from spool to center hole removed per user request.
+  }
+
+  // EXTERNAL WIRE: exits center hole, splits flat to each bud
+  if (pct < 0.97) {
+    const ext = 1 - pct;
+    const spreadR = 0.85 + (BR + 0.55) * ext;
+    const budY = exitY + 0.28;
+    // Tiny stub up from exit hole (height adjusted to 0.12 to clear the new compact raised central ring)
+    try {
+      const c = new THREE.LineCurve3(new THREE.Vector3(0,exitY,0), new THREE.Vector3(0,exitY+0.12,0));
+      wireGrp.add(new THREE.Mesh(new THREE.TubeGeometry(c,2,0.048,6),M.wire));
+    } catch(e){}
+    // Two branches — spread horizontally (X), straight to buds (starting from the taller stub)
+    [{s:-1,z:0.12},{s:1,z:-0.12}].forEach(({s,z})=>{
+      try {
+        const c = new THREE.LineCurve3(
+          new THREE.Vector3(0, exitY+0.12, 0),
+          new THREE.Vector3(s*spreadR, budY, z)
+        );
+        wireGrp.add(new THREE.Mesh(new THREE.TubeGeometry(c, 2, 0.042, 6), M.wire));
+      } catch(e){}
+    });
+  }
+}
+
+// =====================================================================
+//  EARPHONE BUDS
+//  IDLE (cap closed): hidden
+//  Cap open / extended: spread flat outside container on top surface
+//  Retracting: pulled horizontally inward
+//  STORED: only bud heads visible at center hole
+// =====================================================================
+const budGrp = new THREE.Group();
+device.add(budGrp);
+budGrp.visible = false; // hidden until cap opens
+
+function buildBuds(pct) {
+  budGrp.clear();
+  const exitY = BH + 0.06;
+
+  if (pct >= 0.97) {
+    // STORED state: two bud heads sit safely outside the center exit hole
+    [{x:-0.85,z:0},{x:0.85,z:0}].forEach(({x,z})=>{
+      const bud = new THREE.Group();
+      bud.add(new THREE.Mesh(new THREE.SphereGeometry(0.22,14,10), M.earbud));
+      bud.position.set(x, exitY+0.28, z);
+      bud.scale.set(1.5, 1.5, 1.5);
+      budGrp.add(bud);
+    });
+    return;
+  }
+
+  // Extended / retracting: spread outward horizontally, perfectly flat on container top
+  const ext = 1 - pct;
+  const spreadR = 0.85 + (BR + 0.55) * ext;
+  const budY = exitY + 0.28;
+
+  [{x:-spreadR,z:0.12},{x:spreadR,z:-0.12}].forEach(({x,z})=>{
+    const bud = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.28,16,12), M.earbud);
+    const nozzle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.10,0.13,0.30,12),
+      new THREE.MeshPhongMaterial({color:0xdddddd,shininess:40})
+    );
+    nozzle.position.y=-0.26; nozzle.rotation.z=0.3;
+    const tip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13,12,8),
+      new THREE.MeshPhysicalMaterial({color:0xf0f0f0,roughness:0.8,transparent:true,opacity:0.85})
+    );
+    tip.position.y=-0.42; tip.scale.set(1,0.7,1);
+    const grill = new THREE.Mesh(new THREE.CircleGeometry(0.14,20), new THREE.MeshPhongMaterial({color:0x333333}));
+    grill.position.set(0.24,0.05,0); grill.rotation.y=Math.PI/2;
+    bud.add(body,nozzle,tip,grill);
+    bud.position.set(x, budY, z);
+    bud.rotation.z = x<0 ? 0.3 : -0.3;
+    bud.scale.set(1.5, 1.5, 1.5);
+    budGrp.add(bud);
+  });
+}
+
+// =====================================================================
+//  3.5mm JACK (enters from top center)
+// =====================================================================
+const jackGrp = new THREE.Group();
+// Jack plug body
+const jackBody  = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 1.20, 16), M.jack);
+jackBody.position.y = 0.60;
+// Connector tip (silver)
+const jackTip   = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.06, 0.32, 16), M.jacktip);
+jackTip.position.y = 1.36;
+// Bands
+const band1 = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.065, 16), new THREE.MeshPhongMaterial({ color:0x111111, shininess:60 }));
+band1.position.y = 0.28;
+const band2 = band1.clone(); band2.position.y = 0.52;
+const band3 = band1.clone(); band3.position.y = 0.76;
+// Strain relief (rubber collar at bottom of jack)
+const strainRelief = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.35, 12), new THREE.MeshPhongMaterial({ color:0x222222, roughness:0.95 }));
+strainRelief.position.y = -0.18;
+jackGrp.add(jackBody, jackTip, band1, band2, band3, strainRelief);
+// Jack starts above the exit hole, drops down when inserted
+jackGrp.position.set(0, BH + 2.5, 0);
+jackGrp.visible = false;
+device.add(jackGrp);
+
+// =====================================================================
+//  EXPLODE MAP
+// =====================================================================
+const explodeMap = [
+  { obj: upperBody,  base:[0,BH*0.55+BH*0.45*0.5,0], off:[0,4,0] },
+  { obj: capPivot,   base:[0,BH+0.19,BR],             off:[0,6,0] },
+  { obj: winMesh,    base:[0,BH+0.045,0],             off:[0,5.5,0] },
+  { obj: bezel,      base:[0,BH-0.06,0],              off:[0,4.5,0] },
+  { obj: spoolGrp,   base:[0,1.5,0],                  off:[0,2,0] },
+  { obj: pcb,        base:[0,0.55,0],                 off:[0,-2,0] },
+  { obj: sprBarrel,  base:[-2.2,1.4,0],               off:[-3,1.5,0] },
+  { obj: motorGrp,   base:[2.2,1.0,0],                off:[3,1.5,0] },
+  { obj: gbox,       base:[1.45,1.0,0],               off:[2.5,2,0] },
+  { obj: lowerBody,  base:[0,BH*0.55*0.5,0],          off:[0,-3,0] },
+];
+let explodePct = 0, explodeTarget = 0;
+
+// =====================================================================
+//  UI BUILDERS
+// =====================================================================
+(function buildColorGrid() {
+  const g = document.getElementById('colorGrid');
+  COLORS.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'cswatch' + (i===0?' active':'');
+    el.style.background = c.hex;
+    el.title = c.name;
+    el.onclick = () => {
+      document.querySelectorAll('.cswatch').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      curColor = i; updateShellColor();
+      log('Color: '+c.name, 'g');
+    };
+    g.appendChild(el);
+  });
+  document.getElementById('customColor').addEventListener('input', function() {
+    const hex = parseInt(this.value.replace('#',''), 16);
+    customHex = hex; curColor = 'custom'; updateShellColor();
+    log('Custom color applied', 'g');
+  });
+})();
+
+(function buildFinishRow() {
+  const g = document.getElementById('finishRow');
+  FINISHES.forEach((f, i) => {
+    const el = document.createElement('div');
+    el.className = 'fbtn' + (i===curFinish?' active':'');
+    el.textContent = f;
+    el.onclick = () => {
+      document.querySelectorAll('.fbtn').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      curFinish = i; updateShellColor();
+      log('Finish: '+f, 'g');
+    };
+    g.appendChild(el);
+  });
+})();
+
+(function buildPatGrid() {
+  const g = document.getElementById('patGrid');
+  PATTERNS.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'pbtn' + (i===0?' active':'');
+    el.textContent = p;
+    el.onclick = () => {
+      document.querySelectorAll('.pbtn').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      curPattern = i; updateShellColor();
+      log('Pattern: '+p, 'g');
+    };
+    g.appendChild(el);
+  });
+})();
+
+(function buildLEDTheme() {
+  const g = document.getElementById('ledThemeGrid');
+  LED_THEMES.forEach((t, i) => {
+    const el = document.createElement('div');
+    el.className = 'pbtn' + (i===0?' active':'');
+    el.textContent = t;
+    el.onclick = () => {
+      document.querySelectorAll('#ledThemeGrid .pbtn').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      curLEDTheme = i;
+      log('LED: '+t, 'g');
+    };
+    g.appendChild(el);
+  });
+})();
+
+// Timeline
+const STEPS = ['Idle','Insert','Detect','Retract','Slow','Stored'];
+(function buildTimeline() {
+  const tl = document.getElementById('timeline');
+  STEPS.forEach((s, i) => {
+    const wrap = document.createElement('div'); wrap.className = 'tstep';
+    const nw = document.createElement('div'); nw.className = 'tnode-wrap';
+    const nd = document.createElement('div'); nd.className='tnode'; nd.textContent=i+1; nd.id='tn'+i;
+    const lb = document.createElement('div'); lb.className='tlbl'; lb.textContent=s;
+    nw.append(nd, lb); wrap.appendChild(nw);
+    if (i < STEPS.length-1) { const ln=document.createElement('div');ln.className='tstep-line';ln.id='tl'+i;wrap.appendChild(ln); }
+    tl.appendChild(wrap);
+  });
+})();
+
+// LED grid in left panel
+(function buildLEDGrid() {
+  const g = document.getElementById('ledRow');
+  for (let i=0;i<LED_N;i++) {
+    const d=document.createElement('div'); d.className='ld'; d.id='ld'+i;
+    g.appendChild(d);
+  }
+})();
+
+// =====================================================================
+//  STATE MACHINE
+// =====================================================================
+const ST = { IDLE:'IDLE', DETECT:'DETECT', RETRACTING:'RETRACTING', SLOW:'SLOW', STORED:'STORED', ERROR:'ERROR' };
+let state = ST.IDLE;
+let stTimer = 0;
+let wirePct = 0;
+let motorPwm = 0;
+let springN = 0.30;
+let battV = 3.70;
+let tempC = 28;
+let cycles = 0;
+let jackAnimPct = 0, jackIn = false;
+let arOn = true, cutOn = false, explodeOn = false, capOpen = false;
+let capAngle = 0, capTargetAngle = 0;
+
+function setState(s) { state=s; stTimer=0; log('→ '+s, 'a'); updateFSM(); }
+
+function doInsert() {
+  if (state !== ST.IDLE) return;
+  jackGrp.visible = true;
+  jackIn = true;
+  jackAnimPct = 0;
+  // Show wire and buds as cap opens
+  wireGrp.visible = true;
+  budGrp.visible = true;
+  buildWire(0); buildBuds(0);
+  // Auto-open cap if closed
+  if (!capOpen) { capOpen = true; capTargetAngle = Math.PI*0.65; }
+  setState(ST.DETECT);
+  document.getElementById('btnIns').disabled = true;
+  document.getElementById('btnPull').disabled = false;
+  log('Jack inserted into center port', 'a');
+}
+
+function doPull() {
+  if (state !== ST.STORED) return;
+  budDragPct = 0; budDragging = false;
+  wirePct = 0;
+  spoolGrp.rotation.y = 0;
+  buildWire(0); buildBuds(0);
+  wireGrp.visible = true; budGrp.visible = true;
+  setState(ST.IDLE);
+  document.getElementById('btnIns').disabled = false;
+  document.getElementById('btnPull').disabled = true;
+  log('Wire manually extended', 'w');
+}
+
+function doReset() {
+  state=ST.IDLE; stTimer=0; wirePct=0; motorPwm=0;
+  springN=0.30; tempC=28;
+  jackGrp.visible=false; jackIn=false; jackAnimPct=0;
+  spoolGrp.rotation.y=0;
+  capOpen=false; capTargetAngle=0;
+  wireGrp.visible=false; budGrp.visible=false;
+  buildWire(0); buildBuds(0);
+  document.getElementById('btnIns').disabled=false;
+  document.getElementById('btnPull').disabled=true;
+  log('Device reset', 'w');
+  updateFSM();
+}
+
+function toggleAR() {
+  arOn=!arOn;
+  const b=document.getElementById('btnAR');
+  b.className='hbtn'+(arOn?' on':'');
+  b.textContent=arOn?'Auto-rotate':'Rotate OFF';
+}
+function toggleCutaway() {
+  cutOn=!cutOn;
+  document.getElementById('btnCut').className='hbtn'+(cutOn?' on':'');
+  upperBody.material.transparent=cutOn; upperBody.material.opacity=cutOn?0.1:1;
+  lowerBody.material.transparent=cutOn; lowerBody.material.opacity=cutOn?0.1:1;
+  [capDisk, capLip].forEach(c=>{c.material.transparent=cutOn;c.material.opacity=cutOn?0.1:1;});
+  winMesh.material.opacity=cutOn?0.06:0.22;
+  log('X-Ray: '+(cutOn?'ON':'OFF'), 'a');
+}
+function toggleExplode() {
+  explodeOn=!explodeOn;
+  explodeTarget=explodeOn?1:0;
+  document.getElementById('btnExp').className='hbtn'+(explodeOn?' on':'');
+  log('Exploded view: '+(explodeOn?'ON':'OFF'), 'a');
+}
+function toggleCap() {
+  capOpen=!capOpen;
+  capTargetAngle=capOpen?Math.PI*0.65:0;
+  document.getElementById('btnCap').textContent=capOpen?'Close Cap':'Open Cap';
+  document.getElementById('btnCap').className='hbtn'+(capOpen?' on':'');
+  
+  if (capOpen) {
+    wireGrp.visible=true; budGrp.visible=true;
+  } else {
+    wireGrp.visible=false; budGrp.visible=false;
+  }
+  log('Cap: '+(capOpen?'opened':'closed'), 'a');
+}
+
+function setView(v) {
+  const views={
+    iso:    {theta:-0.55,phi:1.08,dist:18,ty:1},
+    top:    {theta:0,    phi:0.07,dist:16,ty:1},
+    front:  {theta:0,    phi:1.32,dist:19,ty:1},
+    side:   {theta:1.57, phi:1.32,dist:19,ty:1},
+    inside: {theta:-0.5, phi:1.55,dist:7, ty:1.5},
+    bottom: {theta:0,    phi:2.85,dist:14,ty:0},
+  };
+  if (views[v]) { camT={...camT,...views[v]}; }
+}
+
+// Logging
+function log(msg, cls) {
+  const lb=document.getElementById('logBox');
+  const ts=new Date().toLocaleTimeString('en',{hour12:false});
+  const d=document.createElement('div'); d.className='ll';
+  d.innerHTML=`<span class="t">[${ts}]</span> <span class="${cls||''}">${msg}</span>`;
+  lb.prepend(d);
+  while(lb.children.length>50) lb.removeChild(lb.lastChild);
+}
+
+// =====================================================================
+//  LED COLOR FUNCTIONS
+// =====================================================================
+function getLEDColor(i, frame) {
+  const n = LED_N;
+  switch(curLEDTheme) {
+    case 0: { // Blue Breath
+      if (state===ST.STORED) return [0,50,255];
+      if (state===ST.RETRACTING) {
+        const head=Math.floor(frame*0.55)%n, dist=(head-i+n)%n;
+        const b=dist<6?(1-dist/6):0;
+        return [Math.round(b*100),0,Math.round(b*255)];
+      }
+      if (state===ST.SLOW) {
+        const head=Math.floor(frame*0.2)%n, dist=(head-i+n)%n;
+        const b=dist<4?(1-dist/4):0;
+        return [0,Math.round(b*60),Math.round(b*200)];
+      }
+      const bri=0.35+0.65*Math.sin(frame*0.032+i*0.2);
+      return [0,Math.round(bri*38),Math.round(bri*255)];
+    }
+    case 1: { // Rainbow
+      const hue=(i/n + frame*0.008)%1;
+      const [r,g,b]=hslToRgb(hue,1,0.5);
+      return [r,g,b];
+    }
+    case 2: { // Purple Comet
+      const head=Math.floor(frame*0.5)%n, dist=(head-i+n)%n;
+      const b=dist<5?(1-dist/5):0;
+      return [Math.round(b*180),0,Math.round(b*255)];
+    }
+    case 3: { // Green Pulse
+      const bri=0.3+0.7*Math.sin(frame*0.04+i*0.25);
+      return [0,Math.round(bri*255),Math.round(bri*80)];
+    }
+    case 4: { // Red Alert
+      const on=Math.floor(frame/10)%2===0;
+      return on?[255,0,0]:[40,0,0];
+    }
+    case 5: { // Cyan Chase
+      const head=Math.floor(frame*0.6)%n, dist=(head-i+n)%n;
+      const b=dist<5?(1-dist/5):0;
+      return [0,Math.round(b*255),Math.round(b*220)];
+    }
+    default: return [0,50,255];
+  }
+}
+
+function hslToRgb(h,s,l) {
+  const a=s*Math.min(l,1-l), f=n=>{ const k=(n+h*12)%12; return l-a*Math.max(Math.min(k-3,9-k,1),-1); };
+  return [Math.round(f(0)*255),Math.round(f(8)*255),Math.round(f(4)*255)];
+}
+
+// FSM display
+const fsmIds=['f0','f1','f2','f3','f4','f5'];
+const fsmNames=['STATE_IDLE','STATE_DETECT','STATE_RETRACTING','STATE_SLOW_STOP','STATE_STORED','STATE_ERROR'];
+function updateFSM() {
+  const idx={IDLE:0,DETECT:1,RETRACTING:2,SLOW:3,STORED:4,ERROR:5}[state]??0;
+  fsmIds.forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.style.color=i===idx?'var(--accent)':'var(--muted)';
+    el.textContent=(i===idx?'→ ':'  ')+fsmNames[i];
+  });
+}
+
+// Timeline
+function updateTimeline() {
+  const step={IDLE:0,DETECT:2,RETRACTING:3,SLOW:4,STORED:5,ERROR:0}[state]??0;
+  for(let i=0;i<STEPS.length;i++) {
+    const nd=document.getElementById('tn'+i);
+    if(!nd) continue;
+    nd.className='tnode'+(i===step?' a':i<step?' d':'');
+    if(i<STEPS.length-1){const ln=document.getElementById('tl'+i);if(ln)ln.className='tstep-line'+(i<step?' d':'');}
+  }
+  document.getElementById('progFill').style.width=wirePct*100+'%';
+}
+
+// Update left panel
+function updateUI() {
+  const dotColors={IDLE:'var(--accent)',DETECT:'#ffb020',RETRACTING:'var(--accent2)',SLOW:'var(--accent2)',STORED:'var(--green)',ERROR:'#ff4466'};
+  const shadows={IDLE:'0 0 6px var(--accent)',DETECT:'0 0 6px #ffb020',RETRACTING:'0 0 6px var(--accent2)',SLOW:'0 0 6px var(--accent2)',STORED:'0 0 6px var(--green)',ERROR:'0 0 6px #ff4466'};
+  document.getElementById('sdot').style.background=dotColors[state]||'var(--accent)';
+  document.getElementById('sdot').style.boxShadow=shadows[state]||'';
+  document.getElementById('slbl').textContent=state;
+  const wp=Math.round(wirePct*100);
+  document.getElementById('mWire').textContent=wp+'%';
+  document.getElementById('bWire').style.width=wp+'%';
+  document.getElementById('mPwm').textContent=motorPwm+'/255';
+  document.getElementById('bPwm').style.width=(motorPwm/255*100).toFixed(0)+'%';
+  document.getElementById('mSpring').textContent=springN.toFixed(2)+'N';
+  document.getElementById('bSpring').style.width=(springN/0.65*100).toFixed(0)+'%';
+  document.getElementById('mCyc').textContent=cycles;
+  document.getElementById('topStatus').textContent='STATE: '+state+' · CYCLES: '+cycles;
+  for(let i=0;i<LED_N;i++){
+    const [r,g,b]=getLEDColor(i,ledFrame);
+    const ld=document.getElementById('ld'+i);
+    if(ld){ld.style.background=`rgb(${r},${g},${b})`;ld.style.boxShadow=(r+g+b>15)?`0 0 4px rgb(${r},${g},${b})`:'none';}
+  }
+  updateFSM(); updateTimeline();
+}
+
+// =====================================================================
+//  MAIN LOOP
+// =====================================================================
+let frameN=0, ledFrame=0;
+const RETRACT_FRAMES=260;
+
+function resize() {
+  const vp=document.getElementById('vp');
+  const W=vp.clientWidth,H=vp.clientHeight;
+  if(renderer.domElement.width!==Math.floor(W*renderer.getPixelRatio())||
+     renderer.domElement.height!==Math.floor(H*renderer.getPixelRatio())){
+    renderer.setSize(W,H,false);
+    camera.aspect=W/H;
+    camera.updateProjectionMatrix();
+  }
+}
+
+function tick() {
+  requestAnimationFrame(tick);
+  frameN++; ledFrame++;
+  resize();
+
+  // Camera
+  const L=0.07;
+  cam.theta+=(camT.theta-cam.theta)*L;
+  cam.phi  +=(camT.phi  -cam.phi  )*L;
+  cam.dist +=(camT.dist -cam.dist )*L;
+  cam.tx   +=(camT.tx   -cam.tx   )*L;
+  cam.ty   +=(camT.ty   -cam.ty   )*L;
+  if(arOn&&!drag) camT.theta+=0.003;
+  applyCam();
+
+  // Cap animation — pivot rotates around rear rim hinge (like a tin lid opening back)
+  capAngle += (capTargetAngle - capAngle) * 0.08;
+  capPivot.rotation.x = capAngle;
+
+  // Jack: only visible while dropping into hole (DETECT state). Hide in all other states.
+  if(state !== ST.DETECT) {
+    jackGrp.visible = false;
+    jackIn = false;
+  }
+
+  // Jack drop animation (enters from top, drops to exit hole — only during DETECT)
+  if(state === ST.DETECT && jackIn && jackAnimPct<1) {
+    jackGrp.visible = true;
+    jackAnimPct=Math.min(1, jackAnimPct+0.022);
+    jackGrp.position.y=BH+2.5-(2.5+0.12)*jackAnimPct;
+    if(jackAnimPct>=1){
+      setState(ST.RETRACTING);
+      cycles++;
+      motorPwm=200;
+      jackGrp.visible=false;
+      jackIn=false;
+      log('Hall HIGH → retraction start. Cycle #'+cycles, 'g');
+    }
+  }
+
+  stTimer++;
+
+  // State machine
+  if(state===ST.RETRACTING){
+    wirePct=Math.min(1, stTimer/RETRACT_FRAMES);
+    motorPwm=wirePct>0.80?100:200;
+    springN=0.30+wirePct*0.22;
+    tempC=Math.min(46,28+wirePct*18);
+    spoolGrp.rotation.y+=wirePct>0.8?0.045:0.12;
+    if(frameN%5===0){ buildWire(wirePct); buildBuds(wirePct); }
+    if(wirePct>=1){ setState(ST.SLOW); motorPwm=100; log('Slow stop phase','w'); }
+  }
+  if(state===ST.SLOW){
+    spoolGrp.rotation.y+=0.018;
+    if(stTimer>38){
+      setState(ST.STORED);
+      motorPwm=0; springN=0.50;
+      jackGrp.visible=false; jackIn=false; jackAnimPct=0;
+      buildWire(1); buildBuds(1);
+      if (capOpen) { wireGrp.visible=true; budGrp.visible=true; }
+      log('Stored. Bud heads visible at center hole.','g');
+    }
+  }
+  if(state===ST.IDLE||state===ST.STORED){
+    if(arOn) spoolGrp.rotation.y+=0.003;
+    motorPwm=0;
+    if(state===ST.IDLE){ tempC=Math.max(28,tempC-0.04); springN=0.30; }
+  }
+  
+  // Sync the visible top cover rotation with the internal spool
+  winMesh.rotation.y = spoolGrp.rotation.y;
+
+  if(state===ST.DETECT && stTimer>70){
+    setState(ST.IDLE); jackGrp.visible=false; jackIn=false;
+    log('Debounce fail → IDLE','e');
+  }
+
+  // Explode lerp
+  explodePct+=(explodeTarget-explodePct)*0.06;
+  for(const em of explodeMap){
+    em.obj.position.set(
+      em.base[0]+em.off[0]*explodePct,
+      em.base[1]+em.off[1]*explodePct,
+      em.base[2]+em.off[2]*explodePct
+    );
+  }
+
+  // LEDs
+  for(let i=0;i<LED_N;i++){
+    const [r,g,b]=getLEDColor(i,ledFrame);
+    const c=new THREE.Color(r/255,g/255,b/255);
+    ledMeshes[i].material.color.copy(c);
+    ledMeshes[i].material.emissive.copy(c);
+    ledMeshes[i].material.emissiveIntensity=(r+g+b>15)?0.9:0;
+    ledLights[i].color.copy(c);
+    ledLights[i].intensity=(r+g+b>15)?0.5:0;
+  }
+
+  if(frameN%3===0) updateUI();
+  renderer.render(scene,camera);
+}
+
+// =====================================================================
+//  INIT
+// =====================================================================
+log('Firmware v1.0.0 boot','a');
+log('LED self-test PASS','g');
+log('Hall sensor OK','g');
+log('STATE → IDLE','a');
+// Wire and buds hidden at start — cap is closed
+wireGrp.visible = false; budGrp.visible = false;
+buildWire(0); buildBuds(0);
+setView('iso');
+tick();
+</script>
+</body>
+</html>
