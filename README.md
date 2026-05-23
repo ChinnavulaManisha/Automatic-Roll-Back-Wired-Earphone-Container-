@@ -1,3 +1,5 @@
+## Demo Link : https://rollbackcontainer.netlify.app/
+
 # 🎧 Automatic Roll-Back Wired Earphone Container
 
 ## 📌 Project Overview
@@ -21,6 +23,9 @@ This project introduces an automatic roll-back mechanism that retracts earphone 
 - 📦 Compact and portable design
 - 👍 User-friendly operation
 - 🛡️ Protects earphones from damage
+- 🎨 Adjustable color customization
+- 🖌️ Multiple pattern and texture options
+- 🌈 Custom LED themes and effects
 - 🎧 Easy storage and handling
 
 ## ⚙️ Working Mechanism
